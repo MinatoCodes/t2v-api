@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: voice-to-text-api
+    env: node
+    buildCommand: |
+      apt-get update
+      apt-get install -y ffmpeg
+      apt-get install -y build-essential cmake git
+      git clone https://github.com/ggerganov/whisper.cpp
+      cd whisper.cpp && make && cp main /usr/local/bin/whisper
+    startCommand: npm start
+    plan: starter
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+    autoDeploy: false
+    
