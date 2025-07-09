@@ -1,5 +1,5 @@
 const express = require("express");
-const { transcribe } = require("./modules/transcribe");
+const { transcribe } = require("./api/transcribe");
 
 const app = express();
 app.use(express.json());
