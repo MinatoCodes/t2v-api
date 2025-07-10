@@ -1,41 +1,24 @@
 const { execSync } = require("child_process");
-const axios = require("axios");
+const path = require("path");
 const fs = require("fs");
 
-async function transcribe(url) {
-  const fileName = `temp_${Date.now()}`;
-  const videoPath = `./${fileName}.mp4`;
-  const audioPath = `./${fileName}.wav`;
-  const writer = fs.createWriteStream(videoPath);
+async function transcribe(filePath) {
+  const absPath = path.resolve(filePath);
+  const outputDir = "/tmp";
+  const baseName = path.basename(absPath, path.extname(absPath));
 
-  // Download file
-  const response = await axios({
-    url,
-    method: "GET",
-    responseType: "stream"
-  });
+  const command = `whisper "${absPath}" --model /app/models/ggml-base.en.bin --language en --output-format txt --output-dir ${outputDir}`;
+  execSync(command);
 
-  response.data.pipe(writer);
+  const transcriptPath = path.join(outputDir, `${baseName}.txt`);
 
-  await new Promise((resolve, reject) => {
-    writer.on("finish", resolve);
-    writer.on("error", reject);
-  });
+  if (!fs.existsSync(transcriptPath)) {
+    throw new Error("Transcription failed: output file not found");
+  }
 
-  // Convert to 16khz mono wav using ffmpeg
-  execSync(`ffmpeg -i ${videoPath} -ar 16000 -ac 1 -c:a pcm_s16le ${audioPath}`);
-
-  // Transcribe with whisper.cpp
-  const output = execSync(`whisper ${audioPath} --model models/ggml-base.en.bin`, {
-    encoding: "utf-8"
-  });
-
-  // Cleanup temp files
-  fs.unlinkSync(videoPath);
-  fs.unlinkSync(audioPath);
-
-  return output;
+  const transcript = fs.readFileSync(transcriptPath, "utf-8");
+  return transcript;
 }
 
 module.exports = { transcribe };
-                     
+  
