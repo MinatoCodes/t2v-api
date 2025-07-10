@@ -1,23 +1,21 @@
 # Use official Node.js 18 image
 FROM node:18
 
-# Set working directory inside container
+# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Install Node.js dependencies
 RUN npm install
 
-# Copy the entire project files into /app
+# Copy entire project files including whisper binary
 COPY . .
 
-# Make your whisper binary executable
+# Make whisper binary executable
 RUN chmod +x /app/whisper
 
-# Expose port 3000 (change if your index.js uses a different port)
+# Expose port
 EXPOSE 3000
 
-# Start your server
+# Start server
 CMD ["node", "index.js"]
