@@ -1,14 +1,15 @@
 {
-  "name": "voice-to-text-api",
+  "name": "whisper-transcribe-api",
   "version": "1.0.0",
-  "description": "API to convert audio/video to text using whisper.cpp",
+  "description": "API to transcribe audio using whisper.cpp binary",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1",
-    "axios": "^1.4.0"
+    "multer": "^1.4.5",
+    "axios": "^1.6.8",
+    "child_process": "^1.0.2"
   }
 }
