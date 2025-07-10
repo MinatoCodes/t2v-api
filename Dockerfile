@@ -1,24 +1,23 @@
-# Use prebuilt whisper.cpp image with whisper binary
-FROM ggerganov/whisper.cpp:latest
+# Use official Node.js 18 image
+FROM node:18
 
-# Install Node.js 18
-RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
-
+# Set working directory inside container
 WORKDIR /app
 
-# Copy package files and install Node dependencies
+# Copy package.json and package-lock.json (if available)
 COPY package*.json ./
+
+# Install Node.js dependencies
 RUN npm install
 
-# Copy your app code
+# Copy the entire project files into /app
 COPY . .
 
-# Download whisper model (if not already present in base image)
-RUN mkdir -p /app/models && \
-    wget -O /app/models/ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+# Make your whisper binary executable
+RUN chmod +x /app/whisper
 
+# Expose port 3000 (change if your index.js uses a different port)
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Start your server
+CMD ["node", "index.js"]
