@@ -12,13 +12,16 @@ const port = process.env.PORT || 3000;
 const upload = multer({ dest: "uploads/" });
 
 // POST endpoint: file upload transcription
-app.post("/transcribe", upload.single("file"), async (req, res) => {
+app.post("/api/transcribe", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded");
 
   try {
     const transcript = await transcribeFile(req.file.path);
     fs.unlinkSync(req.file.path); // Cleanup uploaded file
-    res.json({ transcript });
+    res.json({
+      author: "Subin Sirmal",
+      transcript
+    });
   } catch (error) {
     console.error("Transcription error:", error);
     res.status(500).send("Transcription failed");
@@ -26,7 +29,7 @@ app.post("/transcribe", upload.single("file"), async (req, res) => {
 });
 
 // GET endpoint: download file from URL and transcribe
-app.get("/transcribe", async (req, res) => {
+app.get("/api/transcribe", async (req, res) => {
   const fileUrl = req.query.url;
   if (!fileUrl) return res.status(400).send("Missing 'url' query parameter");
 
@@ -58,7 +61,11 @@ app.get("/transcribe", async (req, res) => {
     // Cleanup downloaded file
     fs.unlinkSync(filePath);
 
-    res.json({ transcript });
+    res.json({
+      author: "MinatoCodes",
+      video_url : fileUrl,
+      transcript
+    });
   } catch (error) {
     console.error("Transcription error:", error);
     res.status(500).send("Transcription failed");
