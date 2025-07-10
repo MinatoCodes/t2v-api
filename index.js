@@ -1,43 +1,47 @@
 const express = require("express");
-const { transcribe } = require("./api/transcribe");
+const { execSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 
 const app = express();
-app.use(express.json());
+const port = process.env.PORT || 3000;
 
-app.get("/", (req, res) => {
-  res.send("✅ Voice to Text API is running.");
-});
+// Setup multer for file uploads
+const upload = multer({ dest: "uploads/" });
 
-// GET route
-app.get("/api/transcribe", async (req, res) => {
-  const url = req.query.url;
+// Endpoint to accept audio/video file upload
+app.post("/transcribe", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).send("No file uploaded");
 
-  if (!url) return res.status(400).json({ success: false, message: "No URL provided" });
+  const inputFilePath = path.resolve(req.file.path);
 
   try {
-    const text = await transcribe(url);
-    res.json({ success: true, transcription: text });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Transcription failed", error: err.message });
+    // Run whisper on the uploaded file
+    const command = `whisper "${inputFilePath}" --model /app/models/ggml-base.en.bin --language en --output-format txt --output-dir /tmp`;
+    execSync(command);
+
+    // whisper outputs a text file with the same base name
+    const baseName = path.basename(inputFilePath, path.extname(inputFilePath));
+    const transcriptPath = `/tmp/${baseName}.txt`;
+
+    if (!fs.existsSync(transcriptPath))
+      return res.status(500).send("Transcription failed");
+
+    const transcript = fs.readFileSync(transcriptPath, "utf-8");
+
+    // Clean up uploaded file and transcript file
+    fs.unlinkSync(inputFilePath);
+    fs.unlinkSync(transcriptPath);
+
+    res.json({ transcript });
+  } catch (error) {
+    console.error("Transcription error:", error);
+    res.status(500).send("Transcription failed");
   }
 });
 
-// POST route
-app.post("/api/transcribe", async (req, res) => {
-  const { url } = req.body;
-
-  if (!url) return res.status(400).json({ success: false, message: "No URL provided" });
-
-  try {
-    const text = await transcribe(url);
-    res.json({ success: true, transcription: text });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Transcription failed", error: err.message });
-  }
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
-
-app.listen(3000, () => {
-  console.log("✅ API running on http://localhost:3000");
-});
+  
