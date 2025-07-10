@@ -3,6 +3,7 @@ const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
+const axios = require("axios");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -10,29 +11,52 @@ const port = process.env.PORT || 3000;
 // Setup multer for file uploads
 const upload = multer({ dest: "uploads/" });
 
-// Endpoint to accept audio/video file upload
-app.post("/transcribe", upload.single("file"), (req, res) => {
+// POST endpoint: file upload transcription
+app.post("/transcribe", upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded");
 
-  const inputFilePath = path.resolve(req.file.path);
+  try {
+    const transcript = await transcribeFile(req.file.path);
+    fs.unlinkSync(req.file.path); // Cleanup uploaded file
+    res.json({ transcript });
+  } catch (error) {
+    console.error("Transcription error:", error);
+    res.status(500).send("Transcription failed");
+  }
+});
+
+// GET endpoint: download file from URL and transcribe
+app.get("/transcribe", async (req, res) => {
+  const fileUrl = req.query.url;
+  if (!fileUrl) return res.status(400).send("Missing 'url' query parameter");
+
+  const fileName = `downloaded_${Date.now()}`;
+  const filePath = path.join("downloads", fileName);
 
   try {
-    // Run whisper on the uploaded file
-    const command = `whisper "${inputFilePath}" --model /app/models/ggml-base.en.bin --language en --output-format txt --output-dir /tmp`;
-    execSync(command);
+    // Ensure downloads directory exists
+    if (!fs.existsSync("downloads")) fs.mkdirSync("downloads");
 
-    // whisper outputs a text file with the same base name
-    const baseName = path.basename(inputFilePath, path.extname(inputFilePath));
-    const transcriptPath = `/tmp/${baseName}.txt`;
+    // Download the file
+    const response = await axios({
+      method: "GET",
+      url: fileUrl,
+      responseType: "stream",
+    });
 
-    if (!fs.existsSync(transcriptPath))
-      return res.status(500).send("Transcription failed");
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
 
-    const transcript = fs.readFileSync(transcriptPath, "utf-8");
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
 
-    // Clean up uploaded file and transcript file
-    fs.unlinkSync(inputFilePath);
-    fs.unlinkSync(transcriptPath);
+    // Transcribe downloaded file
+    const transcript = await transcribeFile(filePath);
+
+    // Cleanup downloaded file
+    fs.unlinkSync(filePath);
 
     res.json({ transcript });
   } catch (error) {
@@ -40,6 +64,27 @@ app.post("/transcribe", upload.single("file"), (req, res) => {
     res.status(500).send("Transcription failed");
   }
 });
+
+// Transcription helper function
+async function transcribeFile(filePath) {
+  const absPath = path.resolve(filePath);
+  const outputDir = "/tmp";
+  const baseName = path.basename(absPath, path.extname(absPath));
+
+  const command = `whisper "${absPath}" --model /app/models/ggml-base.en.bin --language en --output-format txt --output-dir ${outputDir}`;
+  execSync(command);
+
+  const transcriptPath = path.join(outputDir, `${baseName}.txt`);
+
+  if (!fs.existsSync(transcriptPath)) {
+    throw new Error("Transcription failed: output file not found");
+  }
+
+  const transcript = fs.readFileSync(transcriptPath, "utf-8");
+  fs.unlinkSync(transcriptPath); // Cleanup transcript file
+
+  return transcript;
+}
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
